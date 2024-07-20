@@ -6,16 +6,26 @@ import logging
 from typing import Any
 
 from pyatmo import modules as NaModules
+from pyatmo.person import Person
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import (
+    SwitchDeviceClass,
+    SwitchEntity,
+    SwitchEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_URL_CONTROL, NETATMO_CREATE_SWITCH
-from .data_handler import HOME, SIGNAL_NAME, NetatmoDevice
-from .entity import NetatmoModuleEntity
+from .const import (
+    CONF_URL_CONTROL,
+    CONF_URL_SECURITY,
+    NETATMO_CREATE_PERSON_SWITCHES,
+    NETATMO_CREATE_SWITCH,
+)
+from .data_handler import HOME, SIGNAL_NAME, NetatmoDevice, NetatmoPerson
+from .entity import NetatmoModuleEntity, NetatmoPersonEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +45,18 @@ async def async_setup_entry(
 
     entry.async_on_unload(
         async_dispatcher_connect(hass, NETATMO_CREATE_SWITCH, _create_entity)
+    )
+
+    @callback
+    def _create_person_switch_entities(persons: list[NetatmoPerson]) -> None:
+        entities = [NetatmoPersonHomeSwitch(person) for person in persons]
+        _LOGGER.debug("Adding person home switches %s", entities)
+        async_add_entities(entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(
+            hass, NETATMO_CREATE_PERSON_SWITCHES, _create_person_switch_entities
+        )
     )
 
 
@@ -80,3 +102,50 @@ class NetatmoSwitch(NetatmoModuleEntity, SwitchEntity):
         await self.device.async_off()
         self._attr_is_on = False
         self.async_write_ha_state()
+
+
+class NetatmoPersonHomeSwitch(NetatmoPersonEntity, SwitchEntity):
+    """Representation of a Netatmo person home/away switch."""
+
+    person: Person
+    _attr_configuration_url = CONF_URL_SECURITY
+
+    def __init__(self, person: NetatmoPerson) -> None:
+        """Initialize the Netatmo device."""
+        super().__init__(person.data_handler, person.person)
+        self.person = person.person
+        self._signal_name = f"{HOME}-{person.parent_id}"
+        self._publishers.extend(
+            [
+                {
+                    "name": HOME,
+                    "home_id": person.parent_id,
+                    SIGNAL_NAME: self._signal_name,
+                },
+            ]
+        )
+        self.entity_description = SwitchEntityDescription(
+            key="home", device_class=SwitchDeviceClass.SWITCH
+        )
+        self._attr_unique_id = f"{self.person.entity_id}-home"
+        self._attr_is_on = not self.person.out_of_sight
+
+    @callback
+    def async_update_callback(self) -> None:
+        """Update the entity's state."""
+
+        self._attr_is_on = not self.person.out_of_sight
+        self._attr_available = True
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Set person home and notify."""
+        await self.home.async_set_persons_home([self.person.entity_id])
+        self.person.out_of_sight = False
+        self.data_handler.notify(self._signal_name)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Set person away and notify."""
+        await self.home.async_set_persons_away(self.person.entity_id)
+        self.person.out_of_sight = True
+        self.data_handler.notify(self._signal_name)

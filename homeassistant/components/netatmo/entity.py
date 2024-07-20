@@ -8,6 +8,7 @@ from typing import Any, cast
 from pyatmo import DeviceType, Home, Module, Room
 from pyatmo.modules.base_class import NetatmoBase, Place
 from pyatmo.modules.device_types import DEVICE_DESCRIPTION_MAP
+from pyatmo.person import Person
 
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
 from homeassistant.core import callback
@@ -204,3 +205,26 @@ class NetatmoWeatherModuleEntity(NetatmoModuleEntity):
         if "." not in self.device.device_type:
             return super().device_type
         return DeviceType(self.device.device_type.partition(".")[2])
+
+
+class NetatmoPersonEntity(NetatmoDeviceEntity):
+    """Netatmo person entity base class."""
+
+    _attr_configuration_url: str
+
+    def __init__(self, data_handler: NetatmoDataHandler, person: Person) -> None:
+        """Set up Netatmo entity base."""
+        super().__init__(data_handler, person)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self.home.entity_id)},
+            name=self.home.name,
+            manufacturer=self.device_description[0],
+            model=self.device_description[1],
+            configuration_url=self._attr_configuration_url,
+        )
+        self._attr_name = person.pseudo
+
+    @property
+    def device_type(self) -> DeviceType:
+        """Return the device type."""
+        return DeviceType.NACamera
