@@ -9,6 +9,7 @@ MANUFACTURER = "Netatmo"
 DEFAULT_ATTRIBUTION = f"Data provided by {MANUFACTURER}"
 
 PLATFORMS = [
+    Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
     Platform.CAMERA,
     Platform.CLIMATE,
@@ -53,6 +54,7 @@ NETATMO_CREATE_ROOM_SENSOR = "netatmo_create_room_sensor"
 NETATMO_CREATE_SELECT = "netatmo_create_select"
 NETATMO_CREATE_SENSOR = "netatmo_create_sensor"
 NETATMO_CREATE_SIREN_SENSOR = "netatmo_create_siren_sensor"
+NETATMO_CREATE_SIREN_ALARM_CONTROL_PANEL = "netatmo_create_siren_alarm_control_panel"
 NETATMO_CREATE_SWITCH = "netatmo_create_switch"
 NETATMO_CREATE_WEATHER_SENSOR = "netatmo_create_weather_sensor"
 
