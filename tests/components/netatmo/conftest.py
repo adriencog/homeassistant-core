@@ -78,8 +78,32 @@ def mock_config_entry_fixture(hass: HomeAssistant) -> MockConfigEntry:
                     "area_name": "Home min",
                     "mode": "min",
                 },
-            }
+            },
+            "alarm_disarm_persons": ["John Doe"],
         },
+    )
+    mock_entry.add_to_hass(hass)
+
+    return mock_entry
+
+
+@pytest.fixture(name="empty_config_entry")
+def mock_empty_config_entry_fixture(hass: HomeAssistant) -> MockConfigEntry:
+    """Mock a config entry."""
+    mock_entry = MockConfigEntry(
+        domain="netatmo",
+        data={
+            "auth_implementation": "cloud",
+            "token": {
+                "refresh_token": "mock-refresh-token",
+                "access_token": "mock-access-token",
+                "type": "Bearer",
+                "expires_in": 60,
+                "expires_at": time() + 1000,
+                "scope": ALL_SCOPES,
+            },
+        },
+        options={},
     )
     mock_entry.add_to_hass(hass)
 

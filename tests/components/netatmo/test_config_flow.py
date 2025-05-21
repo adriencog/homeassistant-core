@@ -1,7 +1,7 @@
 """Test the Netatmo config flow."""
 
 from ipaddress import ip_address
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from pyatmo.const import ALL_SCOPES
 import pytest
@@ -9,6 +9,7 @@ import pytest
 from homeassistant import config_entries
 from homeassistant.components.netatmo import config_flow
 from homeassistant.components.netatmo.const import (
+    CONF_ALARM_DISARM_PERSONS,
     CONF_NEW_AREA,
     CONF_WEATHER_AREAS,
     DOMAIN,
@@ -29,8 +30,6 @@ from .conftest import CLIENT_ID
 from tests.common import MockConfigEntry, start_reauth_flow
 from tests.test_util.aiohttp import AiohttpClientMocker
 from tests.typing import ClientSessionGenerator
-
-VALID_CONFIG = {}
 
 
 async def test_abort_if_existing_entry(hass: HomeAssistant) -> None:
@@ -114,7 +113,9 @@ async def test_full_flow(
     assert len(mock_setup.mock_calls) == 1
 
 
-async def test_option_flow(hass: HomeAssistant) -> None:
+async def test_option_flow(
+    hass: HomeAssistant, empty_config_entry: MockConfigEntry, netatmo_auth: AsyncMock
+) -> None:
     """Test config flow options."""
     valid_option = {
         "lat_ne": 32.91336,
@@ -136,15 +137,20 @@ async def test_option_flow(hass: HomeAssistant) -> None:
         "mode": "avg",
     }
 
-    config_entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id=DOMAIN,
-        data=VALID_CONFIG,
-        options={},
-    )
-    config_entry.add_to_hass(hass)
+    with patch(
+        "homeassistant.helpers.config_entry_oauth2_flow.async_get_config_entry_implementation",
+    ):
+        await hass.config_entries.async_setup(empty_config_entry.entry_id)
+        await hass.async_block_till_done()
 
-    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await hass.config_entries.options.async_init(empty_config_entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "security"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_ALARM_DISARM_PERSONS: ["John Doe"]}
+    )
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "public_weather_areas"
@@ -169,10 +175,12 @@ async def test_option_flow(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     for k, v in expected_result.items():
-        assert config_entry.options[CONF_WEATHER_AREAS]["Home"][k] == v
+        assert empty_config_entry.options[CONF_WEATHER_AREAS]["Home"][k] == v
 
 
-async def test_option_flow_wrong_coordinates(hass: HomeAssistant) -> None:
+async def test_option_flow_wrong_coordinates(
+    hass: HomeAssistant, empty_config_entry: MockConfigEntry, netatmo_auth: AsyncMock
+) -> None:
     """Test config flow options with mixed up coordinates."""
     valid_option = {
         "lat_ne": 32.1234567,
@@ -194,15 +202,20 @@ async def test_option_flow_wrong_coordinates(hass: HomeAssistant) -> None:
         "mode": "avg",
     }
 
-    config_entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id=DOMAIN,
-        data=VALID_CONFIG,
-        options={},
-    )
-    config_entry.add_to_hass(hass)
+    with patch(
+        "homeassistant.helpers.config_entry_oauth2_flow.async_get_config_entry_implementation",
+    ):
+        await hass.config_entries.async_setup(empty_config_entry.entry_id)
+        await hass.async_block_till_done()
 
-    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await hass.config_entries.options.async_init(empty_config_entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "security"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_ALARM_DISARM_PERSONS: ["John Doe"]}
+    )
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "public_weather_areas"
@@ -227,7 +240,7 @@ async def test_option_flow_wrong_coordinates(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     for k, v in expected_result.items():
-        assert config_entry.options[CONF_WEATHER_AREAS]["Home"][k] == v
+        assert empty_config_entry.options[CONF_WEATHER_AREAS]["Home"][k] == v
 
 
 @pytest.mark.usefixtures("current_request_with_host")

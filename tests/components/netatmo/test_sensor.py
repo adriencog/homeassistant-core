@@ -107,6 +107,9 @@ async def test_public_weather_sensor(
 
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
     result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"alarm_disarm_persons": []}
+    )
+    result = await hass.config_entries.options.async_configure(
         result["flow_id"], user_input={"new_area": "Home avg"}
     )
     result = await hass.config_entries.options.async_configure(

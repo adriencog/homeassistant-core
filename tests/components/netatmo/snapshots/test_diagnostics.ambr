@@ -615,6 +615,9 @@
       'domain': 'netatmo',
       'minor_version': 1,
       'options': dict({
+        'alarm_disarm_persons': list([
+          'John Doe',
+        ]),
         'weather_areas': dict({
           'Home avg': dict({
             'area_name': 'Home avg',
