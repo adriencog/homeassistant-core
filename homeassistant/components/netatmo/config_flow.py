@@ -21,6 +21,7 @@ from homeassistant.helpers import config_entry_oauth2_flow, config_validation as
 
 from .api import get_api_scopes
 from .const import (
+    CONF_ALARM_DISARM_PERSONS,
     CONF_AREA_NAME,
     CONF_LAT_NE,
     CONF_LAT_SW,
@@ -29,8 +30,10 @@ from .const import (
     CONF_NEW_AREA,
     CONF_PUBLIC_MODE,
     CONF_WEATHER_AREAS,
+    DATA_HANDLER,
     DOMAIN,
 )
+from .data_handler import NetatmoDataHandler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,10 +106,47 @@ class NetatmoOptionsFlowHandler(OptionsFlow):
         """Initialize Netatmo options flow."""
         self.options = dict(config_entry.options)
         self.options.setdefault(CONF_WEATHER_AREAS, {})
+        self.options.setdefault(CONF_ALARM_DISARM_PERSONS, [])
 
     async def async_step_init(self, user_input: dict | None = None) -> ConfigFlowResult:
         """Manage the Netatmo options."""
-        return await self.async_step_public_weather_areas()
+        return await self.async_step_security()
+
+    async def async_step_security(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Present security config."""
+
+        if user_input is not None:
+            self.options.update(user_input)
+            return await self.async_step_public_weather_areas()
+
+        data: NetatmoDataHandler = self.hass.data[DOMAIN][self.config_entry.entry_id][
+            DATA_HANDLER
+        ]
+        all_person_names: set[str] = set()
+        for home in data.account.homes.values():
+            names = [
+                person.pseudo
+                for person in home.persons.values()
+                if person.pseudo is not None
+            ]
+            all_person_names.update(names)
+
+        disarm_person_names = list(self.options[CONF_ALARM_DISARM_PERSONS])
+
+        data_schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_ALARM_DISARM_PERSONS,
+                    default=disarm_person_names,
+                ): cv.multi_select(list(all_person_names)),
+            },
+        )
+
+        return self.async_show_form(
+            step_id="security", data_schema=data_schema, last_step=False
+        )
 
     async def async_step_public_weather_areas(
         self, user_input: dict | None = None
@@ -125,7 +165,6 @@ class NetatmoOptionsFlowHandler(OptionsFlow):
                 return await self.async_step_public_weather(
                     user_input={CONF_NEW_AREA: new_client}
                 )
-
             return self._create_options_entry()
 
         weather_areas = list(self.options[CONF_WEATHER_AREAS])
@@ -143,6 +182,7 @@ class NetatmoOptionsFlowHandler(OptionsFlow):
             step_id="public_weather_areas",
             data_schema=data_schema,
             errors=errors,
+            last_step=False,
         )
 
     async def async_step_public_weather(self, user_input: dict) -> ConfigFlowResult:
@@ -204,7 +244,11 @@ class NetatmoOptionsFlowHandler(OptionsFlow):
             }
         )
 
-        return self.async_show_form(step_id="public_weather", data_schema=data_schema)
+        return self.async_show_form(
+            step_id="public_weather",
+            data_schema=data_schema,
+            last_step=False,
+        )
 
     def _create_options_entry(self) -> ConfigFlowResult:
         """Update config entry options."""

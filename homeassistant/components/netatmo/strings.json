@@ -46,6 +46,14 @@
         },
         "description": "Configure public weather sensors.",
         "title": "[%key:component::netatmo::options::step::public_weather::title%]"
+      },
+      "security": {
+        "data": {
+          "security_persons": "Create a switch entity for each registered person.",
+          "alarm_disarm_persons": "Set those persons home to disarm alarm."
+        },
+        "description": "Configure security settings.",
+        "title": "Netatmo Security"
       }
     }
   },
